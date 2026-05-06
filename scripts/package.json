@@ -13,7 +13,7 @@
     "@me/lp-config": "workspace:*",
     "@me/shared": "workspace:*",
     "postgres": "^3.4.5",
-    "zod": "^3.23.8"
+    "zod": "^4.4.3"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
