@@ -1,0 +1,17 @@
+{
+  "mcpServers": {
+    "n8n": {
+      "command": "docker",
+      "args": [
+        "run",
+        "-i",
+        "--rm",
+        "--env-file",
+        "/home/sxtnl/projects/marketing-engine/.env.n8n.local",
+        "--network",
+        "host",
+        "mcp/n8n"
+      ]
+    }
+  }
+}
