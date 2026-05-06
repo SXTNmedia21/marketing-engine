@@ -1,0 +1,108 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`renderTemplateA > snapshot matches for fixture config 1`] = `
+"<!DOCTYPE html>
+<html lang="nb">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Test Headline</title>
+<meta name="description" content="A compelling subheadline">
+<style>
+:root{--p:#0F172A;--bg:#FFFFFF;--t:#111827;--a:#0F172A}
+*{box-sizing:border-box}body{margin:0;font:16px/1.5 system-ui,-apple-system,Segoe UI,Roboto,sans-serif;background:var(--bg);color:var(--t)}
+.wrap{max-width:560px;margin:0 auto;padding:48px 20px}
+h1{font-size:clamp(28px,5vw,40px);line-height:1.15;margin:0 0 12px}
+.sub{font-size:18px;opacity:.85;margin:0 0 28px}
+ul{list-style:none;padding:0;margin:0 0 28px}
+li{padding:8px 0 8px 28px;position:relative}
+li:before{content:"✓";color:var(--a);position:absolute;left:0;font-weight:700}
+.hero-img{width:100%;border-radius:12px;margin:0 0 24px}
+form{display:grid;gap:12px;background:#fff;color:#111;padding:20px;border-radius:12px;box-shadow:0 1px 3px rgba(0,0,0,.1)}
+input,select,textarea{padding:12px;border:1px solid #ccc;border-radius:8px;font:inherit}
+button{padding:14px;border:0;border-radius:8px;background:var(--p);color:#fff;font:600 16px/1 inherit;cursor:pointer}
+button:hover{filter:brightness(.95)}
+.success{padding:20px;background:#e8f5e9;border-radius:8px;color:#1b5e20;display:none}
+</style>
+</head>
+<body>
+<main class="wrap" data-slug="test-lp">
+
+<h1>Test Headline</h1>
+<p class="sub">A compelling subheadline</p>
+<ul><li>Benefit one</li><li>Benefit two</li></ul>
+<form id="me-form" data-slug="test-lp" autocomplete="on" novalidate>
+<label for="f-email">Email</label><input type="email" id="f-email" name="email" required ><label for="f-name">Name</label><input type="text" id="f-name" name="name"  >
+<button type="submit">Get started</button>
+</form>
+<div class="success" id="me-success">Thank you!</div>
+</main>
+<script>(function(){var ME={"slug":"test-lp","campaign_id":"550e8400-e29b-41d4-a716-446655440000","ad_id":null,"variant":null,"request_id":"req_test_001","visitor_id":"vis_abc123","events_endpoint":"https://events.example.com/events","form_endpoint":"https://form.example.com/submit"};window.__ME__=ME;
+var qs=function(s,r){return (r||document).querySelector(s)};
+var send=function(type,payload){try{navigator.sendBeacon(ME.events_endpoint,JSON.stringify({type:type,slug:ME.slug,visitor_id:ME.visitor_id,campaign_id:ME.campaign_id,ad_id:ME.ad_id,variant:ME.variant,ts:Date.now(),payload:payload||{}}))}catch(e){}};
+send('pageview',{viewport:{w:innerWidth,h:innerHeight},lang:navigator.language,ref:document.referrer});
+var depths=[25,50,75,100],fired={};
+addEventListener('scroll',function(){var d=Math.round((scrollY+innerHeight)/document.body.scrollHeight*100);depths.forEach(function(m){if(d>=m&&!fired[m]){fired[m]=1;send('scroll_depth',{milestone:m})}})},{passive:true});
+var hb=0;setInterval(function(){if(document.hasFocus()){hb+=15;send('engagement',{seconds:hb})}},15000);
+var f=qs('#me-form');if(f){f.addEventListener('submit',function(ev){ev.preventDefault();send('form_submit_attempt',{});var data=Object.fromEntries(new FormData(f));fetch(ME.form_endpoint,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({slug:ME.slug,visitor_id:ME.visitor_id,campaign_id:ME.campaign_id,ad_id:ME.ad_id,fields:data,ts:Date.now()})}).then(function(r){if(r.ok){send('form_submit_success',{});f.style.display='none';var s=qs('#me-success');if(s)s.style.display='block'}else{send('form_submit_failed',{status:r.status})}}).catch(function(e){send('form_submit_failed',{error:String(e)})})})}
+addEventListener('beforeunload',function(){send('exit',{seconds:hb})});
+})();</script>
+</body>
+</html>"
+`;
+
+exports[`renderTemplateB > snapshot matches for fixture config 1`] = `
+"<!DOCTYPE html>
+<html lang="nb">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Test Headline</title>
+<meta name="description" content="A compelling subheadline">
+<style>
+:root{--p:#0F172A;--bg:#FFFFFF;--t:#111827;--a:#0F172A}
+*{box-sizing:border-box}body{margin:0;font:16px/1.6 system-ui,-apple-system,Segoe UI,Roboto,sans-serif;background:var(--bg);color:var(--t)}
+.hero{max-width:880px;margin:0 auto;padding:64px 24px 32px;text-align:center}
+h1{font-size:clamp(32px,6vw,56px);line-height:1.1;margin:0 0 16px}
+.sub{font-size:20px;opacity:.85;margin:0 0 32px}
+.section{max-width:720px;margin:0 auto;padding:32px 24px}
+.section h2{font-size:28px;margin:0 0 16px}
+ul{list-style:none;padding:0}
+li{padding:10px 0 10px 32px;position:relative;border-bottom:1px solid rgba(0,0,0,.06)}
+li:before{content:"→";color:var(--a);position:absolute;left:0;font-weight:700}
+video,iframe{width:100%;border-radius:12px;aspect-ratio:16/9;border:0}
+.testimonial{background:rgba(0,0,0,.04);padding:24px;border-radius:12px;font-style:italic}
+.form-wrap{max-width:520px;margin:32px auto;padding:0 24px}
+form{display:grid;gap:12px;background:#fff;color:#111;padding:24px;border-radius:12px;box-shadow:0 2px 8px rgba(0,0,0,.08)}
+input,select,textarea{padding:12px;border:1px solid #ccc;border-radius:8px;font:inherit}
+button{padding:14px;border:0;border-radius:8px;background:var(--p);color:#fff;font:600 16px/1 inherit;cursor:pointer}
+.success{padding:20px;background:#e8f5e9;border-radius:8px;color:#1b5e20;display:none}
+</style>
+</head>
+<body>
+<header class="hero" data-slug="test-lp">
+<h1>Test Headline</h1>
+<p class="sub">A compelling subheadline</p>
+</header>
+
+<section class="section"><h2>Hva du får</h2><ul><li>Benefit one</li><li>Benefit two</li></ul></section>
+<section class="form-wrap">
+<form id="me-form" data-slug="test-lp" autocomplete="on" novalidate>
+<label for="f-email">Email</label><input type="email" id="f-email" name="email" required ><label for="f-name">Name</label><input type="text" id="f-name" name="name"  >
+<button type="submit">Get started</button>
+</form>
+<div class="success" id="me-success">Thank you!</div>
+</section>
+<script>(function(){var ME={"slug":"test-lp","campaign_id":"550e8400-e29b-41d4-a716-446655440000","ad_id":null,"variant":null,"request_id":"req_test_001","visitor_id":"vis_abc123","events_endpoint":"https://events.example.com/events","form_endpoint":"https://form.example.com/submit"};window.__ME__=ME;
+var qs=function(s,r){return (r||document).querySelector(s)};
+var send=function(type,payload){try{navigator.sendBeacon(ME.events_endpoint,JSON.stringify({type:type,slug:ME.slug,visitor_id:ME.visitor_id,campaign_id:ME.campaign_id,ad_id:ME.ad_id,variant:ME.variant,ts:Date.now(),payload:payload||{}}))}catch(e){}};
+send('pageview',{viewport:{w:innerWidth,h:innerHeight},lang:navigator.language,ref:document.referrer});
+var depths=[25,50,75,100],fired={};
+addEventListener('scroll',function(){var d=Math.round((scrollY+innerHeight)/document.body.scrollHeight*100);depths.forEach(function(m){if(d>=m&&!fired[m]){fired[m]=1;send('scroll_depth',{milestone:m})}})},{passive:true});
+var hb=0;setInterval(function(){if(document.hasFocus()){hb+=15;send('engagement',{seconds:hb})}},15000);
+var f=qs('#me-form');if(f){f.addEventListener('submit',function(ev){ev.preventDefault();send('form_submit_attempt',{});var data=Object.fromEntries(new FormData(f));fetch(ME.form_endpoint,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({slug:ME.slug,visitor_id:ME.visitor_id,campaign_id:ME.campaign_id,ad_id:ME.ad_id,fields:data,ts:Date.now()})}).then(function(r){if(r.ok){send('form_submit_success',{});f.style.display='none';var s=qs('#me-success');if(s)s.style.display='block'}else{send('form_submit_failed',{status:r.status})}}).catch(function(e){send('form_submit_failed',{error:String(e)})})})}
+addEventListener('beforeunload',function(){send('exit',{seconds:hb})});
+})();</script>
+</body>
+</html>"
+`;
