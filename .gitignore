@@ -9,6 +9,7 @@ build/
 .next/
 .wrangler/
 .cache/
+*.tsbuildinfo
 
 # Env / secrets
 .env

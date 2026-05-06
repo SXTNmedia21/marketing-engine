@@ -34,18 +34,17 @@ export async function eventsRoute(app: FastifyInstance): Promise<void> {
     const request_id = (req as unknown as { request_id: string }).request_id;
 
     try {
-      const rows = events.map((e) => [
-        new Date(e.ts).toISOString(),
-        e.slug,
-        e.visitor_id,
-        e.type,
-        JSON.stringify(e.payload ?? {}),
-        e.ip_truncated ?? null,
-        e.country ?? null,
-      ]);
+      const rows = events.map((e) => ({
+        ts: new Date(e.ts).toISOString(),
+        slug: e.slug,
+        visitor_id: e.visitor_id,
+        event_type: e.type,
+        payload: JSON.stringify(e.payload ?? {}),
+        ip_truncated: e.ip_truncated ?? null,
+        country: e.country ?? null,
+      }));
       await sql`
-        INSERT INTO lp_events (ts, slug, visitor_id, event_type, payload, ip_truncated, country)
-        SELECT * FROM ${sql(rows)}
+        INSERT INTO lp_events ${sql(rows, 'ts', 'slug', 'visitor_id', 'event_type', 'payload', 'ip_truncated', 'country')}
       `;
       logger.info({
         service: 'control-api',

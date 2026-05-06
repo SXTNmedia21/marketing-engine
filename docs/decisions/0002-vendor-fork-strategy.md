@@ -28,10 +28,14 @@ Fork only what we patch. Pull image for the rest.
 
 | Service | Strategy | Location |
 |---|---|---|
-| Twenty | **Fork.** Sibling clone. | `~/projects/marketing-engine-vendor/twenty/` |
-| Postiz | **Fork.** Sibling clone. | `~/projects/marketing-engine-vendor/postiz-app/` |
+| Twenty | **Fork available, image used.** Switch to source-build when first patch lands. | `~/projects/marketing-engine-vendor/twenty/` (read-only ref) |
+| Postiz | **Fork available, image used.** Same rule. | `~/projects/marketing-engine-vendor/postiz-app/` (read-only ref) |
 | n8n | **Image upstream.** `docker.n8n.io/n8nio/n8n:latest` | — |
-| Postgres, Caddy, Redis, MinIO, Loki, Grafana, Promtail | **Image upstream.** | — |
+| Temporal, Elasticsearch, Postgres, Caddy, Redis, MinIO, Loki, Grafana, Promtail | **Image upstream.** | — |
+
+### Why image-first even with forks
+
+Building Twenty/Postiz from source costs 10–15 min per `docker compose build`. Until we have a real patch in either, that build cost slows every dev cycle for nothing. Forks stay useful for: reading code to design extensions, testing patches locally before contributing upstream, and being ready to flip the `image:` line to `build:` the moment we ship our first patch.
 
 ### Sibling clone, not submodule
 

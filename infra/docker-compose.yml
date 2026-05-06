@@ -8,6 +8,9 @@ x-logging: &default-logging
     tag: "{{.Name}}"
 
 services:
+  # ============================================================
+  # EDGE
+  # ============================================================
   caddy:
     image: caddy:2.8-alpine
     restart: unless-stopped
@@ -19,9 +22,12 @@ services:
       - ./caddy/Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy_data:/data
       - caddy_config:/config
-    networks: [edge, internal]
+    networks: [edge, internal, postiz]
     logging: *default-logging
 
+  # ============================================================
+  # SHARED DATA TIER (marketing_engine + n8n + Twenty `default` DB)
+  # ============================================================
   postgres:
     image: postgres:16-alpine
     restart: unless-stopped
@@ -40,39 +46,71 @@ services:
       retries: 5
     logging: *default-logging
 
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redis_data:/data
+    networks: [internal]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    logging: *default-logging
+
+  # ============================================================
+  # TWENTY CRM — official image (fork via source-build deferred)
+  # ============================================================
   twenty-server:
-    build:
-      context: ../../marketing-engine-vendor/twenty
-      dockerfile: packages/twenty-docker/twenty/Dockerfile
+    image: twentycrm/twenty:${TWENTY_TAG:-latest}
     restart: unless-stopped
     depends_on:
       postgres: { condition: service_healthy }
+      redis: { condition: service_healthy }
     environment:
-      PG_DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/twenty
+      NODE_PORT: 3000
+      PG_DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/default
+      REDIS_URL: redis://redis:6379
       SERVER_URL: ${TWENTY_SERVER_URL}
       APP_SECRET: ${TWENTY_APP_SECRET}
       STORAGE_TYPE: local
       DISABLE_DB_MIGRATIONS: "false"
+      DISABLE_CRON_JOBS_REGISTRATION: "false"
+    volumes:
+      - twenty_server_data:/app/packages/twenty-server/.local-storage
+    networks: [internal]
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:3000/healthz || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+      start_period: 60s
+    logging: *default-logging
+
+  twenty-worker:
+    image: twentycrm/twenty:${TWENTY_TAG:-latest}
+    restart: unless-stopped
+    depends_on:
+      twenty-server: { condition: service_healthy }
+    command: ["yarn", "worker:prod"]
+    environment:
+      PG_DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/default
+      REDIS_URL: redis://redis:6379
+      SERVER_URL: ${TWENTY_SERVER_URL}
+      APP_SECRET: ${TWENTY_APP_SECRET}
+      STORAGE_TYPE: local
+      DISABLE_DB_MIGRATIONS: "true"
+      DISABLE_CRON_JOBS_REGISTRATION: "true"
     volumes:
       - twenty_server_data:/app/packages/twenty-server/.local-storage
     networks: [internal]
     logging: *default-logging
 
-  twenty-worker:
-    build:
-      context: ../../marketing-engine-vendor/twenty
-      dockerfile: packages/twenty-docker/twenty/Dockerfile
-    restart: unless-stopped
-    depends_on:
-      twenty-server: { condition: service_started }
-    command: ["yarn", "worker:prod"]
-    environment:
-      PG_DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/twenty
-      APP_SECRET: ${TWENTY_APP_SECRET}
-      STORAGE_TYPE: local
-    networks: [internal]
-    logging: *default-logging
-
+  # ============================================================
+  # n8n — non-queue (single instance for local; queue mode in prod)
+  # ============================================================
   n8n:
     image: docker.n8n.io/n8nio/n8n:latest
     restart: unless-stopped
@@ -90,44 +128,128 @@ services:
       N8N_PORT: 5678
       WEBHOOK_URL: ${N8N_WEBHOOK_URL}
       GENERIC_TIMEZONE: Europe/Oslo
-      EXECUTIONS_MODE: queue
-      QUEUE_BULL_REDIS_HOST: redis
+      EXECUTIONS_MODE: regular
+      N8N_RUNNERS_ENABLED: "true"
     volumes:
       - n8n_data:/home/node/.n8n
     networks: [internal]
     logging: *default-logging
 
-  redis:
-    image: redis:7-alpine
-    restart: unless-stopped
-    command: ["redis-server", "--appendonly", "yes"]
-    volumes:
-      - redis_data:/data
-    networks: [internal]
-    logging: *default-logging
-
+  # ============================================================
+  # POSTIZ — official image + isolated dependencies (own pg, redis, temporal)
+  # ============================================================
   postiz:
-    build:
-      context: ../../marketing-engine-vendor/postiz-app
-      dockerfile: Dockerfile.dev
+    image: ghcr.io/gitroomhq/postiz-app:latest
     restart: unless-stopped
     depends_on:
-      postgres: { condition: service_healthy }
-      redis: { condition: service_started }
+      postiz-postgres: { condition: service_healthy }
+      postiz-redis: { condition: service_healthy }
+      temporal: { condition: service_started }
     environment:
-      DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/postiz
-      REDIS_URL: redis://redis:6379
-      JWT_SECRET: ${POSTIZ_JWT_SECRET}
       MAIN_URL: ${POSTIZ_MAIN_URL}
       FRONTEND_URL: ${POSTIZ_MAIN_URL}
       NEXT_PUBLIC_BACKEND_URL: ${POSTIZ_MAIN_URL}/api
+      JWT_SECRET: ${POSTIZ_JWT_SECRET}
+      DATABASE_URL: postgres://postiz-user:${POSTIZ_PG_PASSWORD}@postiz-postgres:5432/postiz-db
+      REDIS_URL: redis://postiz-redis:6379
+      BACKEND_INTERNAL_URL: http://localhost:3000
+      TEMPORAL_ADDRESS: temporal:7233
+      IS_GENERAL: "true"
+      DISABLE_REGISTRATION: "false"
       STORAGE_PROVIDER: local
       UPLOAD_DIRECTORY: /uploads
+      NEXT_PUBLIC_UPLOAD_DIRECTORY: /uploads
+      API_LIMIT: 30
+      NX_ADD_PLUGINS: "false"
     volumes:
+      - postiz_config:/config
       - postiz_uploads:/uploads
-    networks: [internal]
+    networks: [postiz, temporal]
     logging: *default-logging
 
+  postiz-postgres:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postiz-user
+      POSTGRES_PASSWORD: ${POSTIZ_PG_PASSWORD}
+      POSTGRES_DB: postiz-db
+    volumes:
+      - postiz_postgres_data:/var/lib/postgresql/data
+    networks: [postiz]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postiz-user -d postiz-db"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    logging: *default-logging
+
+  postiz-redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    volumes:
+      - postiz_redis_data:/data
+    networks: [postiz]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    logging: *default-logging
+
+  # ============================================================
+  # TEMPORAL — workflow engine for Postiz scheduling
+  # ============================================================
+  temporal-postgresql:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: temporal
+      POSTGRES_PASSWORD: ${TEMPORAL_PG_PASSWORD}
+    volumes:
+      - temporal_postgres_data:/var/lib/postgresql/data
+    networks: [temporal]
+    logging: *default-logging
+
+  temporal-elasticsearch:
+    image: elasticsearch:7.17.27
+    restart: unless-stopped
+    environment:
+      cluster.routing.allocation.disk.threshold_enabled: "true"
+      cluster.routing.allocation.disk.watermark.low: "512mb"
+      cluster.routing.allocation.disk.watermark.high: "256mb"
+      cluster.routing.allocation.disk.watermark.flood_stage: "128mb"
+      discovery.type: single-node
+      ES_JAVA_OPTS: "-Xms256m -Xmx256m"
+      xpack.security.enabled: "false"
+    volumes:
+      - temporal_es_data:/usr/share/elasticsearch/data
+    networks: [temporal]
+    logging: *default-logging
+
+  temporal:
+    image: temporalio/auto-setup:1.28.1
+    restart: unless-stopped
+    depends_on:
+      - temporal-postgresql
+      - temporal-elasticsearch
+    environment:
+      DB: postgres12
+      DB_PORT: 5432
+      POSTGRES_USER: temporal
+      POSTGRES_PWD: ${TEMPORAL_PG_PASSWORD}
+      POSTGRES_SEEDS: temporal-postgresql
+      DYNAMIC_CONFIG_FILE_PATH: config/dynamicconfig/development-sql.yaml
+      ENABLE_ES: "true"
+      ES_SEEDS: temporal-elasticsearch
+      ES_VERSION: v7
+      TEMPORAL_NAMESPACE: default
+    networks: [temporal]
+    logging: *default-logging
+
+  # ============================================================
+  # CONTROL API — our Fastify
+  # ============================================================
   control-api:
     build:
       context: ../
@@ -146,6 +268,9 @@ services:
     networks: [internal]
     logging: *default-logging
 
+  # ============================================================
+  # OBJECT STORAGE
+  # ============================================================
   minio:
     image: minio/minio:latest
     restart: unless-stopped
@@ -158,6 +283,9 @@ services:
     networks: [internal]
     logging: *default-logging
 
+  # ============================================================
+  # LOGGING + DASHBOARDS
+  # ============================================================
   loki:
     image: grafana/loki:3.3.2
     restart: unless-stopped
@@ -202,15 +330,24 @@ networks:
     driver: bridge
   internal:
     driver: bridge
+  postiz:
+    driver: bridge
+  temporal:
+    driver: bridge
 
 volumes:
   caddy_data:
   caddy_config:
   postgres_data:
+  redis_data:
   twenty_server_data:
   n8n_data:
-  redis_data:
+  postiz_config:
   postiz_uploads:
+  postiz_postgres_data:
+  postiz_redis_data:
+  temporal_postgres_data:
+  temporal_es_data:
   minio_data:
   loki_data:
   grafana_data:

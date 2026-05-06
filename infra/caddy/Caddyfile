@@ -1,30 +1,36 @@
 # Marketing Engine — Caddy reverse proxy
-# Set domains via env or replace inline. ACME auto-TLS via Let's Encrypt.
+# Local dev: tls internal (self-signed via Caddy local CA).
+# Prod: replace `tls internal` with global email + auto Let's Encrypt.
 
 {
-	email admin@example.com
+	# email admin@example.com   # uncomment in prod for ACME
+	local_certs                  # comment out in prod
 }
 
 # CRM
 crm.example.com {
+	tls internal
 	reverse_proxy twenty-server:3000
 	encode zstd gzip
 }
 
 # n8n
 n8n.example.com {
+	tls internal
 	reverse_proxy n8n:5678
 	encode zstd gzip
 }
 
-# Postiz
+# Postiz (image listens on 5000 internally)
 postiz.example.com {
-	reverse_proxy postiz:3000
+	tls internal
+	reverse_proxy postiz:5000
 	encode zstd gzip
 }
 
 # control-api (lead/event ingest from Cloudflare Workers)
 api.example.com {
+	tls internal
 	reverse_proxy control-api:8080
 	encode zstd gzip
 	@workers {
@@ -35,12 +41,14 @@ api.example.com {
 
 # Grafana
 grafana.example.com {
+	tls internal
 	reverse_proxy grafana:3000
 	encode zstd gzip
 }
 
-# MinIO console (intern only — bind to Tailscale eventually)
+# MinIO console
 minio.example.com {
+	tls internal
 	reverse_proxy minio:9001
 	encode zstd gzip
 }

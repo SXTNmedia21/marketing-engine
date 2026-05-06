@@ -77,6 +77,12 @@ for i in {1..30}; do
   sleep 2
 done
 
+echo "[up]   docker compose up -d postiz-postgres postiz-redis temporal-postgresql temporal-elasticsearch"
+docker compose up -d postiz-postgres postiz-redis temporal-postgresql temporal-elasticsearch
+
+echo "[up]   docker compose up -d temporal"
+docker compose up -d temporal
+
 echo "[up]   docker compose up -d twenty-server twenty-worker n8n postiz control-api"
 docker compose up -d twenty-server twenty-worker n8n postiz control-api
 
@@ -89,10 +95,16 @@ echo " UP. Service URLs (all https via Caddy local CA, accept the warn):"
 echo "==================================================================="
 echo "  Twenty CRM   https://crm.local"
 echo "  n8n          https://n8n.local"
-echo "  Postiz       https://postiz.local"
+echo "  Postiz       https://postiz.local       (heavy: Temporal + ES + own PG)"
 echo "  control-api  https://api.local/health"
 echo "  Grafana      https://grafana.local"
 echo "  MinIO        https://minio.local"
+echo
+echo "Total stack: 14 containers, ~3GB RAM."
+echo
+echo "Trust Caddy local CA on host (one-time, optional):"
+echo "  docker compose exec caddy cat /data/caddy/pki/authorities/local/root.crt | sudo tee /usr/local/share/ca-certificates/caddy-local.crt"
+echo "  sudo update-ca-certificates"
 echo
 echo "Next:"
 echo "  1. Open https://n8n.local → Settings → API → create key"

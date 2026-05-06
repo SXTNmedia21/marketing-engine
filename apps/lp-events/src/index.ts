@@ -19,8 +19,6 @@ interface IncomingEvent {
   payload?: Record<string, unknown>;
 }
 
-const RATE_LIMIT_PER_MIN = 120;
-
 export default {
   async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     const request_id = request.headers.get(REQUEST_ID_HEADER) ?? generateRequestId();
