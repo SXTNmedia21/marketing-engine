@@ -1,3 +1,4 @@
+import { constantTimeEqual } from '@me/shared';
 import { LiveKitSessionEventSchema, type LiveKitSessionEvent } from './types.js';
 
 export interface VoiceWebhookVerifyResult {
@@ -49,11 +50,3 @@ async function hmacSha256Hex(secret: string, message: string): Promise<string> {
     .join('');
 }
 
-function constantTimeEqual(a: string, b: string): boolean {
-  if (a.length !== b.length) return false;
-  let diff = 0;
-  for (let i = 0; i < a.length; i++) {
-    diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
-  }
-  return diff === 0;
-}

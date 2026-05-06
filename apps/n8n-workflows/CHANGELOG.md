@@ -15,6 +15,15 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 
 ---
 
+## [0.1.2] — 2026-05-06
+
+### Fixed
+
+- `me.campaign.launch.json` — security + correctness fixes (C1, C2, H1–H4 from code review)
+  - **H4 — node-12 status 'draft' → 'active'**: `config.status` was forced to `'draft'` before the LP was POSTed to control-api, causing node-15 (kv-sync) to always 409 because kv-sync requires `status = 'active'`. Changed to `'active'` with comment: "We approve at the workflow level; LP goes live as part of campaign launch."
+
+---
+
 ## [0.1.1] — 2026-05-06
 
 ### Fixed

@@ -33,6 +33,8 @@ export function buildGa4Payload(events: ServerEvent[]) {
 export async function sendGa4(events: ServerEvent[], cfg: Ga4Config): Promise<PixelDispatchResult> {
   const payload = buildGa4Payload(events);
   if (!payload) return { platform: 'ga4', ok: true };
+  // GA4 Measurement Protocol requires api_secret as a query parameter (Google's spec).
+  // NEVER include the full URL in any log output — it contains the api_secret in plaintext.
   const url = `https://www.google-analytics.com/mp/collect?measurement_id=${cfg.measurement_id}&api_secret=${cfg.api_secret}`;
   try {
     const res = await fetch(url, {
@@ -41,6 +43,13 @@ export async function sendGa4(events: ServerEvent[], cfg: Ga4Config): Promise<Pi
     });
     return { platform: 'ga4', ok: res.ok, status: res.status };
   } catch (err) {
-    return { platform: 'ga4', ok: false, error: String(err) };
+    // Redact api_secret from any error message that may have captured the URL
+    // (e.g. from a fetch error that includes the request URL in its toString).
+    const safeError = String(err).replace(/api_secret=[^&"\s]+/g, 'api_secret=REDACTED');
+    return {
+      platform: 'ga4',
+      ok: false,
+      error: `ga4_send_failed mid:${cfg.measurement_id.slice(0, 6)}… ${safeError}`,
+    };
   }
 }

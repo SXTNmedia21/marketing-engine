@@ -8,10 +8,11 @@ account_id = "REPLACE_ME"
 CONTROL_PLANE_URL = "https://api.REPLACE_ME"
 TURNSTILE_SECRET = ""
 ENVIRONMENT = "development"
+ALLOWED_ORIGINS = ""
 
 [env.staging]
-vars = { ENVIRONMENT = "staging", CONTROL_PLANE_URL = "https://staging-api.REPLACE_ME" }
+vars = { ENVIRONMENT = "staging", CONTROL_PLANE_URL = "https://staging-api.REPLACE_ME", ALLOWED_ORIGINS = "" }
 
 [env.production]
-vars = { ENVIRONMENT = "production", CONTROL_PLANE_URL = "https://api.REPLACE_ME" }
+vars = { ENVIRONMENT = "production", CONTROL_PLANE_URL = "https://api.REPLACE_ME", ALLOWED_ORIGINS = "" }
 routes = [{ pattern = "submit.lp.REPLACE_ME/*", zone_name = "REPLACE_ME" }]

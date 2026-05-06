@@ -5,6 +5,8 @@ export interface Env {
   CONTROL_PLANE_TOKEN: string;
   TURNSTILE_SECRET?: string;
   ENVIRONMENT: string;
+  /** Comma-separated list of allowed CORS origins.  Required in staging/prod. */
+  ALLOWED_ORIGINS?: string;
 }
 
 interface FormSubmission {
@@ -17,11 +19,48 @@ interface FormSubmission {
   turnstile_token?: string;
 }
 
+/**
+ * Resolve the CORS origin header value for a given request.
+ *
+ * Rules:
+ * - If the request Origin matches one of the ALLOWED_ORIGINS entries → echo it back.
+ * - In development (ENVIRONMENT === 'development') → allow '*' as fallback.
+ * - In staging/prod with a non-matching or absent Origin → return null (→ 403).
+ */
+function resolveCorsOrigin(requestOrigin: string | null, env: Env): string | null {
+  const allowed = (env.ALLOWED_ORIGINS ?? '')
+    .split(',')
+    .map((o) => o.trim())
+    .filter(Boolean);
+
+  if (requestOrigin && allowed.includes(requestOrigin)) {
+    return requestOrigin;
+  }
+
+  // In staging/prod a non-matching origin is rejected.  Any other environment
+  // (development, test, local, etc.) falls back to wildcard for convenience.
+  const isStrictEnv = env.ENVIRONMENT === 'staging' || env.ENVIRONMENT === 'production';
+  if (!isStrictEnv) {
+    return '*';
+  }
+
+  return null;
+}
+
 export default {
   async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     const request_id = request.headers.get(REQUEST_ID_HEADER) ?? generateRequestId();
-    const corsHeaders = {
-      'access-control-allow-origin': '*',
+    const requestOrigin = request.headers.get('origin');
+    const corsOrigin = resolveCorsOrigin(requestOrigin, env);
+
+    // In staging/prod, reject requests from unlisted origins up-front.
+    const isStrictEnv = env.ENVIRONMENT === 'staging' || env.ENVIRONMENT === 'production';
+    if (!corsOrigin && isStrictEnv) {
+      return new Response('Forbidden', { status: 403 });
+    }
+
+    const corsHeaders: Record<string, string> = {
+      'access-control-allow-origin': corsOrigin ?? '*',
       'access-control-allow-methods': 'POST,OPTIONS',
       'access-control-allow-headers': 'content-type',
       'access-control-max-age': '86400',
@@ -49,7 +88,36 @@ export default {
       return new Response('Missing required fields', { status: 400, headers: corsHeaders });
     }
 
-    if (env.TURNSTILE_SECRET) {
+    // Turnstile is MANDATORY in staging/prod.
+    // In any other environment (development, test, etc.), log a warning and proceed if
+    // TURNSTILE_SECRET is missing.
+    if (isStrictEnv) {
+      if (!env.TURNSTILE_SECRET) {
+        // Fail-closed: misconfiguration in staging/prod must never silently pass.
+        logger.error({
+          service: 'lp-form',
+          request_id,
+          event: 'turnstile_misconfigured',
+          slug: body.slug,
+          payload: { message: 'TURNSTILE_SECRET is not set in a non-development environment.' },
+        });
+        return new Response('Server misconfiguration', { status: 500, headers: corsHeaders });
+      }
+      const ok = await verifyTurnstile(body.turnstile_token ?? '', env.TURNSTILE_SECRET);
+      if (!ok) {
+        logger.warn({ service: 'lp-form', request_id, event: 'turnstile_failed', slug: body.slug });
+        return new Response('Bot verification failed', { status: 403, headers: corsHeaders });
+      }
+    } else if (!env.TURNSTILE_SECRET) {
+      // Non-prod environment with no TURNSTILE_SECRET — warn and skip.
+      logger.warn({
+        service: 'lp-form',
+        request_id,
+        event: 'turnstile_skipped_dev',
+        slug: body.slug,
+        payload: { message: 'TURNSTILE_SECRET not set — skipping Turnstile in development.' },
+      });
+    } else {
       const ok = await verifyTurnstile(body.turnstile_token ?? '', env.TURNSTILE_SECRET);
       if (!ok) {
         logger.warn({ service: 'lp-form', request_id, event: 'turnstile_failed', slug: body.slug });

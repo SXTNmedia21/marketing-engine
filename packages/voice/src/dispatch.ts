@@ -1,3 +1,5 @@
+// TODO: If the dispatch endpoint ever requires a header credential (e.g. a shared
+// secret for mutual auth), add it here as a separate cfg field — do NOT reuse api_key.
 import { AccessToken } from 'livekit-server-sdk';
 import { logger } from '@me/shared';
 import type { DispatchInput, DispatchResult } from './types.js';
@@ -37,8 +39,9 @@ export class VoiceDispatcher {
       const res = await fetch(this.cfg.agent_dispatch_endpoint, {
         method: 'POST',
         headers: {
+          // LiveKit agent dispatch authenticates via the signed access_token in the body,
+          // not via an Authorization header.  api_key must NOT be sent as a Bearer token.
           'content-type': 'application/json',
-          authorization: `Bearer ${this.cfg.api_key}`,
         },
         body: JSON.stringify({
           agent: 'marketing_bdr',

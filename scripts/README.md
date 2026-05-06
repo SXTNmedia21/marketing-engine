@@ -89,7 +89,9 @@ ENVIRONMENT=dev
 - **Audit**: every push attempt writes a row to `lp_kv_pushes` regardless of outcome.
 - **Privacy**: `account_id_hash` in audit rows is SHA-256 of the account ID, truncated to 16 hex chars. Raw account ID is never logged.
 
-### Database migration
+### Database migration — required prerequisite
+
+**`kv-push.ts` will refuse to run if this migration has not been applied.**
 
 Run before first use:
 
@@ -97,4 +99,9 @@ Run before first use:
 psql "$DATABASE_URL" -f infra/postgres/init/04-kv-sync.sql
 ```
 
-This adds `kv_synced_at` / `kv_sync_status` columns to `lp_pages` and creates the `lp_kv_pushes` audit table.
+This adds `kv_synced_at` / `kv_sync_status` columns to `lp_pages` (with the correct
+`CHECK (kv_sync_status IN ('pending', 'synced', 'failed'))` constraint) and creates
+the `lp_kv_pushes` audit table.
+
+`04-kv-sync.sql` is the single source of truth for this schema.  Do not add or modify
+these columns outside the migration file.

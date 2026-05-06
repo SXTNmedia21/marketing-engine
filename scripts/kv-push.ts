@@ -266,19 +266,25 @@ async function main(): Promise<void> {
     process.exit(2);
   }
 
-  // Ensure migration columns exist (kv_synced_at, kv_sync_status)
-  // These are added in 04-kv-sync.sql; guard here so the script doesn't
-  // crash if migration hasn't run yet.
-  try {
-    await sql`
-      ALTER TABLE lp_pages
-        ADD COLUMN IF NOT EXISTS kv_synced_at    timestamptz,
-        ADD COLUMN IF NOT EXISTS kv_sync_status  text
-          CHECK (kv_sync_status IN ('synced','failed'))
-    `;
-  } catch {
-    // Best-effort: table may already have the columns or user lacks ALTER rights.
-    // The main queries will fail with a clear column-not-found error if needed.
+  // Verify that 04-kv-sync.sql has been applied before proceeding.
+  // The inline ALTER TABLE was removed (H1): the migration is the single source
+  // of truth for the schema, including the correct CHECK constraint that includes
+  // 'pending' (which the inline ALTER was missing).
+  const migrationCheck = await sql<{ column_name: string }[]>`
+    SELECT column_name
+    FROM information_schema.columns
+    WHERE table_name = 'lp_pages'
+      AND column_name = 'kv_synced_at'
+  `;
+  if (migrationCheck.length === 0) {
+    logger.fatal({
+      service: 'kv-push',
+      request_id: sessionRequestId,
+      event: 'migration_missing',
+      payload: { message: 'Run infra/postgres/init/04-kv-sync.sql before using kv-push.ts.' },
+    });
+    await sql.end();
+    process.exit(2);
   }
 
   // Query candidates
