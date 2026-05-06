@@ -1,0 +1,630 @@
+{
+  "name": "me.campaign.launch",
+  "tags": [
+    { "name": "project:marketing-engine" },
+    { "name": "domain:campaign" },
+    { "name": "stage:dev" }
+  ],
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true,
+    "callerPolicy": "workflowsFromSameOwner",
+    "errorWorkflow": ""
+  },
+  "staticData": null,
+  "nodes": [
+    {
+      "id": "node-01-webhook",
+      "name": "Webhook — Campaign Status Changed",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [200, 300],
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "me.campaign.launch",
+        "responseMode": "onReceived",
+        "responseCode": 200,
+        "responseData": "firstEntryJson",
+        "options": {}
+      },
+      "notes": "Twenty sends POST when Campaign.status → pending_review. Payload: { campaign_id, request_id, event, object_metadata }"
+    },
+    {
+      "id": "node-02-set-context",
+      "name": "Set — Extract & Propagate Context",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [440, 300],
+      "parameters": {
+        "mode": "manual",
+        "includeOtherFields": false,
+        "fields": {
+          "values": [
+            {
+              "name": "campaign_id",
+              "type": "string",
+              "value": "={{ $json.body.campaign_id ?? $json.body.record?.id ?? $json.body.recordId }}"
+            },
+            {
+              "name": "request_id",
+              "type": "string",
+              "value": "={{ $json.body.request_id ?? $json.body.webhookId ?? ('req_' + $now.toISO()) }}"
+            },
+            {
+              "name": "received_at",
+              "type": "string",
+              "value": "={{ $now.toISO() }}"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "node-03-validate-input",
+      "name": "IF — campaign_id Present?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [680, 300],
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": false, "leftValue": "", "typeValidation": "strict" },
+          "conditions": [
+            {
+              "id": "cond-has-id",
+              "leftValue": "={{ $json.campaign_id }}",
+              "rightValue": "",
+              "operator": { "type": "string", "operation": "notEmpty" }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "node-04-get-campaign",
+      "name": "HTTP — GET Campaign from Twenty",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [920, 200],
+      "parameters": {
+        "method": "POST",
+        "url": "http://twenty-server:3000/api",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "httpBearerAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Content-Type", "value": "application/json" },
+            { "name": "X-Request-Id", "value": "={{ $('Set — Extract & Propagate Context').item.json.request_id }}" }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ JSON.stringify({ query: `query GetCampaign($id: ID!) { campaign(id: $id) { id name goal offer { markdown } persona status aiBudgetNok aiSpentNok startDate endDate reviewNotes } }`, variables: { id: $('Set — Extract & Propagate Context').item.json.campaign_id } }) }}",
+        "options": {
+          "timeout": 10000,
+          "response": { "response": { "fullResponse": false } }
+        }
+      },
+      "credentials": {
+        "httpBearerAuth": { "id": "", "name": "twenty_api" }
+      },
+      "notes": "GraphQL query against Twenty server. Returns campaign record including persona JSON and offer rich text."
+    },
+    {
+      "id": "node-05-set-campaign",
+      "name": "Set — Flatten Campaign Record",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [1160, 200],
+      "parameters": {
+        "mode": "manual",
+        "includeOtherFields": false,
+        "fields": {
+          "values": [
+            { "name": "campaign_id", "type": "string", "value": "={{ $json.data.campaign.id }}" },
+            { "name": "campaign_name", "type": "string", "value": "={{ $json.data.campaign.name }}" },
+            { "name": "campaign_goal", "type": "string", "value": "={{ $json.data.campaign.goal ?? '' }}" },
+            { "name": "campaign_offer", "type": "string", "value": "={{ $json.data.campaign.offer?.markdown ?? '' }}" },
+            { "name": "campaign_persona", "type": "string", "value": "={{ JSON.stringify($json.data.campaign.persona ?? {}) }}" },
+            { "name": "campaign_status", "type": "string", "value": "={{ $json.data.campaign.status }}" },
+            { "name": "request_id", "type": "string", "value": "={{ $('Set — Extract & Propagate Context').item.json.request_id }}" }
+          ]
+        }
+      }
+    },
+    {
+      "id": "node-06-brand-check",
+      "name": "Anthropic Haiku — Brand Voice Check",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1400, 200],
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.anthropic.com/v1/messages",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "httpCustomAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "anthropic-version", "value": "2023-06-01" },
+            { "name": "X-Request-Id", "value": "={{ $('Set — Extract & Propagate Context').item.json.request_id }}" }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ JSON.stringify({ model: 'claude-haiku-4-5', max_tokens: 1024, system: 'You are a brand voice auditor. Evaluate the offer and persona for clarity, tone, and brand safety. Respond ONLY with valid JSON: { \"score\": <0-100>, \"flags\": [\"<issue>\"], \"pass\": <true|false>, \"summary\": \"<one sentence>\" }. Score >= 70 means pass.', messages: [{ role: 'user', content: `Campaign: ${$json.campaign_name}\nGoal: ${$json.campaign_goal}\nOffer: ${$json.campaign_offer}\nPersona: ${$json.campaign_persona}\n\nScore for brand voice, clarity and safety (0-100). Return JSON only.` }] }) }}",
+        "options": {
+          "timeout": 30000,
+          "response": { "response": { "fullResponse": false } }
+        }
+      },
+      "credentials": {
+        "httpCustomAuth": { "id": "", "name": "anthropic_api" }
+      },
+      "notes": "Haiku: ~500 tok in + 256 tok out ≈ 0.19 NOK. Hard limit: max_tokens=1024."
+    },
+    {
+      "id": "node-07-parse-brand",
+      "name": "Code — Parse Brand Check Result",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1640, 200],
+      "parameters": {
+        "jsCode": "const raw = $input.first().json;\nconst requestId = $('Set — Extract & Propagate Context').first().json.request_id;\nconst campaignId = $('Set — Flatten Campaign Record').first().json.campaign_id;\n\n// Anthropic returns content[0].text\nlet brandResult;\ntry {\n  const text = raw.content?.[0]?.text ?? raw.text ?? '';\n  brandResult = JSON.parse(text.trim());\n} catch (e) {\n  brandResult = { score: 0, flags: ['parse_error'], pass: false, summary: 'Failed to parse brand check response: ' + e.message };\n}\n\nreturn [{\n  json: {\n    request_id: requestId,\n    campaign_id: campaignId,\n    campaign_name: $('Set — Flatten Campaign Record').first().json.campaign_name,\n    campaign_goal: $('Set — Flatten Campaign Record').first().json.campaign_goal,\n    campaign_offer: $('Set — Flatten Campaign Record').first().json.campaign_offer,\n    campaign_persona: $('Set — Flatten Campaign Record').first().json.campaign_persona,\n    brand_score: brandResult.score ?? 0,\n    brand_flags: brandResult.flags ?? [],\n    brand_pass: brandResult.pass ?? false,\n    brand_summary: brandResult.summary ?? ''\n  }\n}];\n"
+      }
+    },
+    {
+      "id": "node-08-brand-gate",
+      "name": "IF — Brand Score >= 70?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [1880, 200],
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": false, "leftValue": "", "typeValidation": "strict" },
+          "conditions": [
+            {
+              "id": "cond-brand-pass",
+              "leftValue": "={{ $json.brand_pass }}",
+              "rightValue": true,
+              "operator": { "type": "boolean", "operation": "true" }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "node-09-ad-gen",
+      "name": "Anthropic Sonnet — Ad Variant Gen",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [2120, 100],
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.anthropic.com/v1/messages",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "httpCustomAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "anthropic-version", "value": "2023-06-01" },
+            { "name": "X-Request-Id", "value": "={{ $json.request_id }}" }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ JSON.stringify({ model: 'claude-sonnet-4-5', max_tokens: 2000, system: 'You are a direct-response copywriter. Generate ad variants for the given campaign. Respond ONLY with valid JSON matching this exact schema: { \"variants\": [ { \"variant_tag\": \"v1_meta\", \"platform\": \"meta\", \"headline\": \"string max 60 chars\", \"body_copy\": \"string max 280 chars\", \"cta_label\": \"string max 25 chars\", \"angle\": \"pain|desire|social_proof\" }, ... ] }. Generate 3 variants × 3 platforms (meta, tiktok, google) = 9 total variants. Use the persona language and tone.', messages: [{ role: 'user', content: `Campaign: ${$json.campaign_name}\nGoal: ${$json.campaign_goal}\nOffer: ${$json.campaign_offer}\nPersona: ${$json.campaign_persona}\nBrand notes: ${$json.brand_summary}\n\nGenerate 9 ad variants (3 per platform: meta, tiktok, google). Return JSON only.` }] }) }}",
+        "options": {
+          "timeout": 60000,
+          "response": { "response": { "fullResponse": false } }
+        }
+      },
+      "credentials": {
+        "httpCustomAuth": { "id": "", "name": "anthropic_api" }
+      },
+      "notes": "Sonnet: ~1500 tok in + 1800 tok out ≈ 9.9 NOK. 9 variants × platforms."
+    },
+    {
+      "id": "node-10-parse-ads",
+      "name": "Code — Parse Ad Variants",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2360, 100],
+      "parameters": {
+        "jsCode": "const raw = $input.first().json;\nconst upstream = $('Code — Parse Brand Check Result').first().json;\n\nlet adResult;\ntry {\n  const text = raw.content?.[0]?.text ?? raw.text ?? '';\n  adResult = JSON.parse(text.trim());\n} catch (e) {\n  throw new Error('Ad variant parse failed: ' + e.message);\n}\n\nif (!adResult.variants || !Array.isArray(adResult.variants)) {\n  throw new Error('Ad variant response missing .variants array');\n}\n\n// Emit one item per variant, all carrying request_id and campaign context\nreturn adResult.variants.map((v, idx) => ({\n  json: {\n    request_id: upstream.request_id,\n    campaign_id: upstream.campaign_id,\n    campaign_name: upstream.campaign_name,\n    campaign_goal: upstream.campaign_goal,\n    campaign_offer: upstream.campaign_offer,\n    campaign_persona: upstream.campaign_persona,\n    brand_summary: upstream.brand_summary,\n    variant_index: idx,\n    variant_tag: v.variant_tag ?? `v${idx + 1}_${v.platform}`,\n    platform: v.platform,\n    headline: v.headline,\n    body_copy: v.body_copy,\n    cta_label: v.cta_label,\n    angle: v.angle\n  }\n}));\n"
+      }
+    },
+    {
+      "id": "node-11-lp-gen",
+      "name": "Anthropic Sonnet — LP Config Gen",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [2600, 100],
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.anthropic.com/v1/messages",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "httpCustomAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "anthropic-version", "value": "2023-06-01" },
+            { "name": "X-Request-Id", "value": "={{ $json.request_id }}" }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ JSON.stringify({ model: 'claude-sonnet-4-5', max_tokens: 2000, system: 'You are a landing page config generator. For the given ad variant, produce a complete LP config JSON. The JSON MUST match this exact TypeScript schema:\\n{\\n  slug: string (lowercase, digits, hyphens only, 3-64 chars),\\n  template: \\'template_a_lead_capture\\' | \\'template_b_long_form\\',\\n  version: 1,\\n  theme: { primary: string (hex), background: string (hex), text: string (hex), accent?: string (hex) },\\n  hero: { headline: string (max 140), subheadline?: string (max 280) },\\n  bullets: string[] (max 6 items, max 280 chars each),\\n  form: { fields: [{ name, label, type: email|text|tel|textarea|select|checkbox, required: bool, placeholder? }], submit_label: string, success_message: string },\\n  pixels: {},\\n  tracking: { campaign_id: string (uuid), ad_id?: string, variant?: string, utm_source?: string, utm_medium?: string, utm_campaign?: string },\\n  status: \\'draft\\'\\n}\\nReturn ONLY valid JSON, no markdown.', messages: [{ role: 'user', content: `Campaign ID: ${$json.campaign_id}\nCampaign: ${$json.campaign_name}\nGoal: ${$json.campaign_goal}\nOffer: ${$json.campaign_offer}\nPersona: ${$json.campaign_persona}\nPlatform: ${$json.platform}\nVariant tag: ${$json.variant_tag}\nAd headline: ${$json.headline}\nAd body: ${$json.body_copy}\nCTA: ${$json.cta_label}\n\nGenerate the LP config JSON for this ad variant. Slug must start with campaign name slug + variant tag. Use template_a_lead_capture for cold traffic (meta/tiktok/google).` }] }) }}",
+        "options": {
+          "timeout": 60000,
+          "response": { "response": { "fullResponse": false } }
+        }
+      },
+      "credentials": {
+        "httpCustomAuth": { "id": "", "name": "anthropic_api" }
+      },
+      "notes": "Sonnet: ~1200 tok in + 800 tok out per variant ≈ 6 NOK. Runs per variant item."
+    },
+    {
+      "id": "node-12-validate-lp",
+      "name": "Code — Validate LP Config (Zod-inline)",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2840, 100],
+      "parameters": {
+        "jsCode": "// Inline LP config validation (mirrors @me/lp-config Zod schema).\n// n8n Code nodes cannot import workspace packages, so we replicate the rules.\n\nconst raw = $input.all();\nconst results = [];\n\nfor (const item of raw) {\n  const upstream = item.json;\n  let config;\n\n  // Parse Anthropic response\n  try {\n    const text = upstream.content?.[0]?.text ?? upstream.text ?? '';\n    // Strip possible markdown fences\n    const cleaned = text.trim().replace(/^```json\\s*/i, '').replace(/^```\\s*/i, '').replace(/\\s*```$/i, '');\n    config = JSON.parse(cleaned);\n  } catch (e) {\n    throw new Error(`LP config parse error for variant ${upstream.variant_tag}: ${e.message}`);\n  }\n\n  // --- Validation rules (mirrors Zod schema) ---\n  const errors = [];\n\n  if (typeof config.slug !== 'string' || config.slug.length < 3 || config.slug.length > 64 || !/^[a-z0-9-]+$/.test(config.slug)) {\n    errors.push('slug: must be 3-64 chars, lowercase/digits/hyphens only');\n  }\n\n  const validTemplates = ['template_a_lead_capture', 'template_b_long_form'];\n  if (!validTemplates.includes(config.template)) {\n    errors.push(`template: must be one of ${validTemplates.join(', ')}`);\n  }\n\n  if (!config.theme || typeof config.theme.primary !== 'string' || typeof config.theme.background !== 'string' || typeof config.theme.text !== 'string') {\n    errors.push('theme: primary, background, text are required strings');\n  }\n\n  if (!config.hero || typeof config.hero.headline !== 'string' || config.hero.headline.length < 1 || config.hero.headline.length > 140) {\n    errors.push('hero.headline: required string, max 140 chars');\n  }\n\n  if (!Array.isArray(config.bullets) || config.bullets.length > 6) {\n    errors.push('bullets: must be array max 6 items');\n  }\n\n  if (!config.form || !Array.isArray(config.form.fields) || config.form.fields.length < 1 || config.form.fields.length > 8) {\n    errors.push('form.fields: must be array 1-8 items');\n  } else {\n    const validFieldTypes = ['email', 'text', 'tel', 'textarea', 'select', 'checkbox'];\n    config.form.fields.forEach((f, i) => {\n      if (!f.name || typeof f.name !== 'string') errors.push(`form.fields[${i}].name: required`);\n      if (!f.label || typeof f.label !== 'string') errors.push(`form.fields[${i}].label: required`);\n      if (!validFieldTypes.includes(f.type)) errors.push(`form.fields[${i}].type: invalid`);\n    });\n  }\n\n  if (!config.form?.submit_label) errors.push('form.submit_label: required');\n  if (!config.form?.success_message) errors.push('form.success_message: required');\n\n  if (!config.tracking || typeof config.tracking.campaign_id !== 'string') {\n    errors.push('tracking.campaign_id: required uuid string');\n  }\n\n  if (errors.length > 0) {\n    throw new Error(`LP config validation failed for variant ${upstream.variant_tag}: ${errors.join('; ')}`);\n  }\n\n  // Force status=draft and ensure version=1\n  config.status = 'draft';\n  config.version = config.version ?? 1;\n  config.pixels = config.pixels ?? {};\n\n  results.push({\n    json: {\n      request_id: upstream.request_id,\n      campaign_id: upstream.campaign_id,\n      variant_tag: upstream.variant_tag,\n      platform: upstream.platform,\n      headline: upstream.headline,\n      body_copy: upstream.body_copy,\n      cta_label: upstream.cta_label,\n      angle: upstream.angle,\n      lp_config: config,\n      lp_slug: config.slug\n    }\n  });\n}\n\nreturn results;\n"
+      }
+    },
+    {
+      "id": "node-13-post-lp",
+      "name": "HTTP — POST LP Config to control-api",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [3080, 100],
+      "parameters": {
+        "method": "POST",
+        "url": "http://control-api:8080/api/lp",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "httpBearerAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Content-Type", "value": "application/json" },
+            { "name": "Idempotency-Key", "value": "={{ $json.campaign_id + '_' + $json.variant_tag + '_post-lp' }}" },
+            { "name": "X-Request-Id", "value": "={{ $json.request_id }}" }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ JSON.stringify($json.lp_config) }}",
+        "options": {
+          "timeout": 15000,
+          "response": { "response": { "fullResponse": false } },
+          "redirect": { "redirect": { "followRedirects": true, "maxRedirects": 3 } }
+        }
+      },
+      "credentials": {
+        "httpBearerAuth": { "id": "", "name": "control_plane_token" }
+      },
+      "notes": "control-api saves config to Postgres (lp_pages) and returns { id, slug }."
+    },
+    {
+      "id": "node-14-set-lp-id",
+      "name": "Set — Attach LP ID & Slug",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [3320, 100],
+      "parameters": {
+        "mode": "manual",
+        "includeOtherFields": true,
+        "fields": {
+          "values": [
+            { "name": "lp_id", "type": "string", "value": "={{ $json.id }}" },
+            { "name": "lp_slug", "type": "string", "value": "={{ $json.slug ?? $('Code — Validate LP Config (Zod-inline)').item.json.lp_slug }}" }
+          ]
+        }
+      }
+    },
+    {
+      "id": "node-15-kv-sync",
+      "name": "HTTP — POST KV Sync Trigger",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [3560, 100],
+      "parameters": {
+        "method": "POST",
+        "url": "http://control-api:8080/api/lp/kv-sync",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "httpBearerAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Content-Type", "value": "application/json" },
+            { "name": "Idempotency-Key", "value": "={{ $json.campaign_id + '_' + $json.variant_tag + '_kv-sync' }}" },
+            { "name": "X-Request-Id", "value": "={{ $json.request_id }}" }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ JSON.stringify({ slug: $json.lp_slug, lp_id: $json.lp_id }) }}",
+        "options": {
+          "timeout": 15000,
+          "response": { "response": { "fullResponse": false } }
+        }
+      },
+      "credentials": {
+        "httpBearerAuth": { "id": "", "name": "control_plane_token" }
+      },
+      "notes": "Pushes LP config to Cloudflare KV. URL goes live immediately after this call."
+    },
+    {
+      "id": "node-16-postiz-schedule",
+      "name": "HTTP — POST Postiz Schedule Ad",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [3800, 100],
+      "parameters": {
+        "method": "POST",
+        "url": "http://postiz:3000/api/posts",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "httpBearerAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Content-Type", "value": "application/json" },
+            { "name": "Idempotency-Key", "value": "={{ $json.campaign_id + '_' + $json.variant_tag + '_postiz' }}" },
+            { "name": "X-Request-Id", "value": "={{ $json.request_id }}" }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ JSON.stringify({ platform: $json.platform, headline: $json.headline, body: $json.body_copy, cta: $json.cta_label, destination_url: 'https://lp.' + ($json.lp_slug) + '.example.com/lp/' + $json.lp_slug, variant_tag: $json.variant_tag, campaign_id: $json.campaign_id, status: 'scheduled', metadata: { angle: $json.angle, lp_id: $json.lp_id, request_id: $json.request_id } }) }}",
+        "options": {
+          "timeout": 15000,
+          "response": { "response": { "fullResponse": false } }
+        }
+      },
+      "credentials": {
+        "httpBearerAuth": { "id": "", "name": "postiz_api" }
+      },
+      "notes": "Schedules ad creative in Postiz. Each variant gets its own post pointing to its dedicated LP URL."
+    },
+    {
+      "id": "node-17-collect-results",
+      "name": "Code — Collect & Summarize Results",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [4040, 100],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "// Aggregate all variant results into one summary for the final PATCH to Twenty.\nconst items = $input.all();\nconst requestId = items[0]?.json?.request_id ?? 'unknown';\nconst campaignId = items[0]?.json?.campaign_id ?? 'unknown';\n\nconst slugs = items.map(i => i.json.lp_slug).filter(Boolean);\nconst platforms = [...new Set(items.map(i => i.json.platform))];\nconst variantCount = items.length;\n\nreturn [{\n  json: {\n    request_id: requestId,\n    campaign_id: campaignId,\n    variant_count: variantCount,\n    slugs: slugs,\n    platforms: platforms,\n    success: true\n  }\n}];\n"
+      }
+    },
+    {
+      "id": "node-18-patch-approved",
+      "name": "HTTP — PATCH Twenty Campaign → approved",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [4280, 100],
+      "parameters": {
+        "method": "POST",
+        "url": "http://twenty-server:3000/api",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "httpBearerAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Content-Type", "value": "application/json" },
+            { "name": "X-Request-Id", "value": "={{ $json.request_id }}" }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ JSON.stringify({ query: 'mutation UpdateCampaignApproved($id: ID!, $reviewNotes: String) { updateCampaign(id: $id, data: { status: approved, reviewNotes: $reviewNotes }) { id status } }', variables: { id: $json.campaign_id, reviewNotes: `Auto-approved. ${$json.variant_count} variants generated for platforms: ${$json.platforms.join(', ')}. Slugs: ${$json.slugs.join(', ')}.` } }) }}",
+        "options": {
+          "timeout": 10000,
+          "response": { "response": { "fullResponse": false } }
+        }
+      },
+      "credentials": {
+        "httpBearerAuth": { "id": "", "name": "twenty_api" }
+      }
+    },
+    {
+      "id": "node-19-error-invalid-input",
+      "name": "HTTP — PATCH Twenty Campaign → failed (no id)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [680, 500],
+      "parameters": {
+        "method": "POST",
+        "url": "http://twenty-server:3000/api",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "httpBearerAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ JSON.stringify({ query: 'mutation UpdateCampaignFailed($id: ID!, $reason: String) { updateCampaign(id: $id, data: { status: failed, failureReason: $reason }) { id status } }', variables: { id: $('Set — Extract & Propagate Context').item.json.campaign_id ?? 'unknown', reason: 'Webhook payload missing campaign_id. Cannot process.' } }) }}",
+        "options": { "timeout": 10000 }
+      },
+      "credentials": {
+        "httpBearerAuth": { "id": "", "name": "twenty_api" }
+      },
+      "notes": "Reached when campaign_id is absent from webhook payload."
+    },
+    {
+      "id": "node-20-error-brand-fail",
+      "name": "HTTP — PATCH Twenty Campaign → failed (brand)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1880, 400],
+      "parameters": {
+        "method": "POST",
+        "url": "http://twenty-server:3000/api",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "httpBearerAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Content-Type", "value": "application/json" },
+            { "name": "X-Request-Id", "value": "={{ $json.request_id }}" }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ JSON.stringify({ query: 'mutation UpdateCampaignFailed($id: ID!, $reason: String) { updateCampaign(id: $id, data: { status: failed, failureReason: $reason }) { id status } }', variables: { id: $json.campaign_id, reason: `Brand check failed (score: ${$json.brand_score}/100). Flags: ${($json.brand_flags ?? []).join(', ')}. ${$json.brand_summary}` } }) }}",
+        "options": { "timeout": 10000 }
+      },
+      "credentials": {
+        "httpBearerAuth": { "id": "", "name": "twenty_api" }
+      }
+    },
+    {
+      "id": "node-21-error-trigger",
+      "name": "Error Trigger — Catch Workflow Errors",
+      "type": "n8n-nodes-base.errorTrigger",
+      "typeVersion": 1,
+      "position": [200, 600],
+      "parameters": {}
+    },
+    {
+      "id": "node-22-error-handler",
+      "name": "HTTP — PATCH Twenty Campaign → failed (exception)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [440, 600],
+      "parameters": {
+        "method": "POST",
+        "url": "http://twenty-server:3000/api",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "httpBearerAuth",
+        "sendHeaders": true,
+        "headerParameters": [
+          { "name": "Content-Type", "value": "application/json" }
+        ],
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ JSON.stringify({ query: 'mutation UpdateCampaignFailed($id: ID!, $reason: String) { updateCampaign(id: $id, data: { status: failed, failureReason: $reason }) { id status } }', variables: { id: $json.execution?.customData?.campaign_id ?? 'unknown', reason: ('Workflow exception: ' + ($json.error?.message ?? 'unknown error') + ' in node: ' + ($json.error?.node?.name ?? 'unknown')) } }) }}",
+        "options": { "timeout": 10000 }
+      },
+      "credentials": {
+        "httpBearerAuth": { "id": "", "name": "twenty_api" }
+      },
+      "notes": "Catches any unhandled exception across the whole workflow and marks campaign failed."
+    }
+  ],
+  "connections": {
+    "Webhook — Campaign Status Changed": {
+      "main": [
+        [{ "node": "Set — Extract & Propagate Context", "type": "main", "index": 0 }]
+      ]
+    },
+    "Set — Extract & Propagate Context": {
+      "main": [
+        [{ "node": "IF — campaign_id Present?", "type": "main", "index": 0 }]
+      ]
+    },
+    "IF — campaign_id Present?": {
+      "main": [
+        [{ "node": "HTTP — GET Campaign from Twenty", "type": "main", "index": 0 }],
+        [{ "node": "HTTP — PATCH Twenty Campaign → failed (no id)", "type": "main", "index": 0 }]
+      ]
+    },
+    "HTTP — GET Campaign from Twenty": {
+      "main": [
+        [{ "node": "Set — Flatten Campaign Record", "type": "main", "index": 0 }]
+      ]
+    },
+    "Set — Flatten Campaign Record": {
+      "main": [
+        [{ "node": "Anthropic Haiku — Brand Voice Check", "type": "main", "index": 0 }]
+      ]
+    },
+    "Anthropic Haiku — Brand Voice Check": {
+      "main": [
+        [{ "node": "Code — Parse Brand Check Result", "type": "main", "index": 0 }]
+      ]
+    },
+    "Code — Parse Brand Check Result": {
+      "main": [
+        [{ "node": "IF — Brand Score >= 70?", "type": "main", "index": 0 }]
+      ]
+    },
+    "IF — Brand Score >= 70?": {
+      "main": [
+        [{ "node": "Anthropic Sonnet — Ad Variant Gen", "type": "main", "index": 0 }],
+        [{ "node": "HTTP — PATCH Twenty Campaign → failed (brand)", "type": "main", "index": 0 }]
+      ]
+    },
+    "Anthropic Sonnet — Ad Variant Gen": {
+      "main": [
+        [{ "node": "Code — Parse Ad Variants", "type": "main", "index": 0 }]
+      ]
+    },
+    "Code — Parse Ad Variants": {
+      "main": [
+        [{ "node": "Anthropic Sonnet — LP Config Gen", "type": "main", "index": 0 }]
+      ]
+    },
+    "Anthropic Sonnet — LP Config Gen": {
+      "main": [
+        [{ "node": "Code — Validate LP Config (Zod-inline)", "type": "main", "index": 0 }]
+      ]
+    },
+    "Code — Validate LP Config (Zod-inline)": {
+      "main": [
+        [{ "node": "HTTP — POST LP Config to control-api", "type": "main", "index": 0 }]
+      ]
+    },
+    "HTTP — POST LP Config to control-api": {
+      "main": [
+        [{ "node": "Set — Attach LP ID & Slug", "type": "main", "index": 0 }]
+      ]
+    },
+    "Set — Attach LP ID & Slug": {
+      "main": [
+        [{ "node": "HTTP — POST KV Sync Trigger", "type": "main", "index": 0 }]
+      ]
+    },
+    "HTTP — POST KV Sync Trigger": {
+      "main": [
+        [{ "node": "HTTP — POST Postiz Schedule Ad", "type": "main", "index": 0 }]
+      ]
+    },
+    "HTTP — POST Postiz Schedule Ad": {
+      "main": [
+        [{ "node": "Code — Collect & Summarize Results", "type": "main", "index": 0 }]
+      ]
+    },
+    "Code — Collect & Summarize Results": {
+      "main": [
+        [{ "node": "HTTP — PATCH Twenty Campaign → approved", "type": "main", "index": 0 }]
+      ]
+    },
+    "Error Trigger — Catch Workflow Errors": {
+      "main": [
+        [{ "node": "HTTP — PATCH Twenty Campaign → failed (exception)", "type": "main", "index": 0 }]
+      ]
+    }
+  }
+}
