@@ -6,6 +6,8 @@ import { eventsRoute } from './routes/events.js';
 import { leadsRoute } from './routes/leads.js';
 import { lpRoute } from './routes/lp.js';
 import { healthRoute } from './routes/health.js';
+import { emailWebhookRoute } from './routes/email-webhook.js';
+import { voiceWebhookRoute } from './routes/voice-webhook.js';
 import { config } from './config.js';
 import { initDb } from './db.js';
 
@@ -34,6 +36,8 @@ async function main() {
   await app.register(eventsRoute, { prefix: '/api' });
   await app.register(leadsRoute, { prefix: '/api' });
   await app.register(lpRoute, { prefix: '/api' });
+  await app.register(emailWebhookRoute, { prefix: '/webhooks' });
+  await app.register(voiceWebhookRoute, { prefix: '/webhooks' });
 
   try {
     await app.listen({ host: '0.0.0.0', port: config.port });

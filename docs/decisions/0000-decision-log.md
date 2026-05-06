@@ -17,5 +17,8 @@ Master index of architectural decisions for Marketing Engine.
 | ADR-0002 | Sibling vendor forks for Twenty + Postiz, image-only for rest | 2026-05-06 | accepted |
 | ADR-0003 | Self-hosted Loki + Grafana on Hetzner for unified logging | 2026-05-06 | accepted |
 | ADR-0004 | Multi-account = team/operator level (Grafana orgs + Twenty workspaces) | 2026-05-06 | accepted |
+| ADR-0005 | Workflow orchestration split: n8n (external) + Twenty AI Agent (CRM-internal) | 2026-05-06 | accepted |
+| ADR-0006 | Voice via shared LiveKit, marketing_bdr persona alongside mr_botsson | 2026-05-06 | accepted |
+| ADR-0007 | Email: Resend + React Email + svix-signed webhooks | 2026-05-06 | accepted |
 
 ADRs themselves: `docs/decisions/<id>-<slug>.md`.

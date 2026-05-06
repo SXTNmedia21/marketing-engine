@@ -12,9 +12,11 @@
     "clean": "rm -rf dist .turbo"
   },
   "dependencies": {
+    "@me/email": "workspace:*",
     "@me/lp-config": "workspace:*",
     "@me/shared": "workspace:*",
     "@me/tracking": "workspace:*",
+    "@me/voice": "workspace:*",
     "fastify": "^5.2.0",
     "@fastify/helmet": "^13.0.0",
     "@fastify/rate-limit": "^10.2.1",
