@@ -1,0 +1,133 @@
+import type { ObjectDef } from '../types.js';
+
+export const Ad: ObjectDef = {
+  nameSingular: 'ad',
+  namePlural: 'ads',
+  labelSingular: 'Ad',
+  labelPlural: 'Ads',
+  description: 'Single ad creative on a platform — variant of a campaign, points to one LP.',
+  icon: 'IconAd',
+  fields: [
+    {
+      name: 'platform',
+      label: 'Platform',
+      type: 'SELECT',
+      isNullable: false,
+      options: [
+        { value: 'meta', label: 'Meta (Facebook/Instagram)', color: 'blue', position: 0 },
+        { value: 'tiktok', label: 'TikTok', color: 'pink', position: 1 },
+        { value: 'google', label: 'Google Ads', color: 'yellow', position: 2 },
+        { value: 'linkedin', label: 'LinkedIn', color: 'blue', position: 3 },
+        { value: 'youtube', label: 'YouTube', color: 'red', position: 4 },
+        { value: 'twitter', label: 'X / Twitter', color: 'gray', position: 5 },
+        { value: 'reddit', label: 'Reddit', color: 'orange', position: 6 },
+      ],
+    },
+    {
+      name: 'platformAdId',
+      label: 'Platform Ad ID',
+      type: 'TEXT',
+      description: 'Native ID assigned by Meta/TikTok/Google after publish.',
+    },
+    {
+      name: 'platformCampaignId',
+      label: 'Platform Campaign ID',
+      type: 'TEXT',
+    },
+    {
+      name: 'platformAdSetId',
+      label: 'Platform Ad Set ID',
+      type: 'TEXT',
+    },
+    {
+      name: 'creativeAssetUrl',
+      label: 'Creative Asset URL',
+      type: 'LINK',
+    },
+    {
+      name: 'headline',
+      label: 'Headline',
+      type: 'TEXT',
+    },
+    {
+      name: 'bodyCopy',
+      label: 'Body Copy',
+      type: 'RICH_TEXT',
+    },
+    {
+      name: 'ctaLabel',
+      label: 'CTA Label',
+      type: 'TEXT',
+    },
+    {
+      name: 'variant',
+      label: 'Variant Tag',
+      type: 'TEXT',
+      description: 'Used in tracking URL and attribution.',
+    },
+    {
+      name: 'status',
+      label: 'Status',
+      type: 'SELECT',
+      defaultValue: 'draft',
+      isNullable: false,
+      options: [
+        { value: 'draft', label: 'Draft', color: 'gray', position: 0 },
+        { value: 'pending_review', label: 'Pending Review', color: 'yellow', position: 1 },
+        { value: 'live', label: 'Live', color: 'green', position: 2 },
+        { value: 'paused', label: 'Paused', color: 'orange', position: 3 },
+        { value: 'rejected_by_platform', label: 'Rejected by Platform', color: 'red', position: 4 },
+        { value: 'completed', label: 'Completed', color: 'purple', position: 5 },
+      ],
+    },
+    {
+      name: 'spendNok',
+      label: 'Spend (NOK)',
+      type: 'CURRENCY',
+      defaultValue: 0,
+      settings: { currencyCode: 'NOK' },
+    },
+    {
+      name: 'impressions',
+      label: 'Impressions',
+      type: 'NUMBER',
+      defaultValue: 0,
+    },
+    {
+      name: 'clicks',
+      label: 'Clicks',
+      type: 'NUMBER',
+      defaultValue: 0,
+    },
+    {
+      name: 'conversions',
+      label: 'Conversions',
+      type: 'NUMBER',
+      defaultValue: 0,
+    },
+    {
+      name: 'lastSyncedAt',
+      label: 'Last Synced At',
+      type: 'DATE_TIME',
+      description: 'When metrics were last pulled from platform.',
+    },
+  ],
+  relations: [
+    {
+      name: 'campaign',
+      label: 'Campaign',
+      cardinality: 'MANY_TO_ONE',
+      targetObject: 'campaigns',
+      targetFieldName: 'ads',
+      targetFieldLabel: 'Ads',
+    },
+    {
+      name: 'landingPage',
+      label: 'Landing Page',
+      cardinality: 'MANY_TO_ONE',
+      targetObject: 'landingPages',
+      targetFieldName: 'ads',
+      targetFieldLabel: 'Ads',
+    },
+  ],
+};
