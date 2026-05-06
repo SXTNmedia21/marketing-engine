@@ -15,6 +15,17 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 
 ---
 
+## [0.1.1] — 2026-05-06
+
+### Fixed
+
+- `me.campaign.launch.json` — G2 integration audit fixes (3 issues)
+  - **Postiz port mismatch**: `http://postiz:3000/api/posts` → `http://postiz:5000/api/posts` (container listens on 5000 per Caddyfile/docker-compose)
+  - **Twenty GET endpoint**: node-04 changed from POST `/api` (GraphQL) to GET `/rest/campaigns/:id` (REST); node-05 flatten updated from `$json.data.campaign.*` to `$json.*` to match REST response shape
+  - **Twenty PATCH endpoints**: all 5 nodes (node-18 approved, node-19/20/22 failed error paths) changed from POST `/api` (GraphQL mutation) to PATCH `/rest/campaigns/:id` with plain JSON body `{ status, failureReason/reviewNotes }`; node-22 `headerParameters` also fixed from bare array to canonical `{ parameters: [...] }` object
+
+---
+
 ## [0.1.0] — 2026-05-06
 
 ### Added

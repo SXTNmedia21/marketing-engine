@@ -4,7 +4,7 @@
 ALTER TABLE lp_pages
   ADD COLUMN IF NOT EXISTS kv_synced_at   timestamptz,
   ADD COLUMN IF NOT EXISTS kv_sync_status text
-    CHECK (kv_sync_status IN ('synced', 'failed'));
+    CHECK (kv_sync_status IN ('pending', 'synced', 'failed'));
 
 CREATE INDEX IF NOT EXISTS idx_lp_pages_kv_sync
   ON lp_pages (status, kv_synced_at)
@@ -16,7 +16,7 @@ CREATE TABLE IF NOT EXISTS lp_kv_pushes (
   slug            text        NOT NULL,
   version         int,
   status          text        NOT NULL
-                    CHECK (status IN ('pushed', 'failed', 'validation_failed', 'dry_run')),
+                    CHECK (status IN ('queued', 'pushed', 'failed', 'validation_failed', 'dry_run')),
   pushed_at       timestamptz NOT NULL DEFAULT now(),
   error           text,
   request_id      text,

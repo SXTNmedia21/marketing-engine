@@ -88,8 +88,8 @@
       "typeVersion": 4.2,
       "position": [920, 200],
       "parameters": {
-        "method": "POST",
-        "url": "http://twenty-server:3000/api",
+        "method": "GET",
+        "url": "=http://twenty-server:3000/rest/campaigns/{{ $('Set — Extract & Propagate Context').item.json.campaign_id }}",
         "authentication": "predefinedCredentialType",
         "nodeCredentialType": "httpBearerAuth",
         "sendHeaders": true,
@@ -99,10 +99,6 @@
             { "name": "X-Request-Id", "value": "={{ $('Set — Extract & Propagate Context').item.json.request_id }}" }
           ]
         },
-        "sendBody": true,
-        "contentType": "raw",
-        "rawContentType": "application/json",
-        "body": "={{ JSON.stringify({ query: `query GetCampaign($id: ID!) { campaign(id: $id) { id name goal offer { markdown } persona status aiBudgetNok aiSpentNok startDate endDate reviewNotes } }`, variables: { id: $('Set — Extract & Propagate Context').item.json.campaign_id } }) }}",
         "options": {
           "timeout": 10000,
           "response": { "response": { "fullResponse": false } }
@@ -111,7 +107,7 @@
       "credentials": {
         "httpBearerAuth": { "id": "", "name": "twenty_api" }
       },
-      "notes": "GraphQL query against Twenty server. Returns campaign record including persona JSON and offer rich text."
+      "notes": "REST GET against Twenty /rest/campaigns/:id. Returns campaign record including persona JSON and offer rich text."
     },
     {
       "id": "node-05-set-campaign",
@@ -124,12 +120,12 @@
         "includeOtherFields": false,
         "fields": {
           "values": [
-            { "name": "campaign_id", "type": "string", "value": "={{ $json.data.campaign.id }}" },
-            { "name": "campaign_name", "type": "string", "value": "={{ $json.data.campaign.name }}" },
-            { "name": "campaign_goal", "type": "string", "value": "={{ $json.data.campaign.goal ?? '' }}" },
-            { "name": "campaign_offer", "type": "string", "value": "={{ $json.data.campaign.offer?.markdown ?? '' }}" },
-            { "name": "campaign_persona", "type": "string", "value": "={{ JSON.stringify($json.data.campaign.persona ?? {}) }}" },
-            { "name": "campaign_status", "type": "string", "value": "={{ $json.data.campaign.status }}" },
+            { "name": "campaign_id", "type": "string", "value": "={{ $json.id }}" },
+            { "name": "campaign_name", "type": "string", "value": "={{ $json.name }}" },
+            { "name": "campaign_goal", "type": "string", "value": "={{ $json.goal ?? '' }}" },
+            { "name": "campaign_offer", "type": "string", "value": "={{ $json.offer?.markdown ?? '' }}" },
+            { "name": "campaign_persona", "type": "string", "value": "={{ JSON.stringify($json.persona ?? {}) }}" },
+            { "name": "campaign_status", "type": "string", "value": "={{ $json.status }}" },
             { "name": "request_id", "type": "string", "value": "={{ $('Set — Extract & Propagate Context').item.json.request_id }}" }
           ]
         }
@@ -375,7 +371,7 @@
       "position": [3800, 100],
       "parameters": {
         "method": "POST",
-        "url": "http://postiz:3000/api/posts",
+        "url": "http://postiz:5000/api/posts",
         "authentication": "predefinedCredentialType",
         "nodeCredentialType": "httpBearerAuth",
         "sendHeaders": true,
@@ -418,8 +414,8 @@
       "typeVersion": 4.2,
       "position": [4280, 100],
       "parameters": {
-        "method": "POST",
-        "url": "http://twenty-server:3000/api",
+        "method": "PATCH",
+        "url": "=http://twenty-server:3000/rest/campaigns/{{ $json.campaign_id }}",
         "authentication": "predefinedCredentialType",
         "nodeCredentialType": "httpBearerAuth",
         "sendHeaders": true,
@@ -432,7 +428,7 @@
         "sendBody": true,
         "contentType": "raw",
         "rawContentType": "application/json",
-        "body": "={{ JSON.stringify({ query: 'mutation UpdateCampaignApproved($id: ID!, $reviewNotes: String) { updateCampaign(id: $id, data: { status: approved, reviewNotes: $reviewNotes }) { id status } }', variables: { id: $json.campaign_id, reviewNotes: `Auto-approved. ${$json.variant_count} variants generated for platforms: ${$json.platforms.join(', ')}. Slugs: ${$json.slugs.join(', ')}.` } }) }}",
+        "body": "={{ JSON.stringify({ status: 'approved', reviewNotes: `Auto-approved. ${$json.variant_count} variants generated for platforms: ${$json.platforms.join(', ')}. Slugs: ${$json.slugs.join(', ')}.` }) }}",
         "options": {
           "timeout": 10000,
           "response": { "response": { "fullResponse": false } }
@@ -449,8 +445,8 @@
       "typeVersion": 4.2,
       "position": [680, 500],
       "parameters": {
-        "method": "POST",
-        "url": "http://twenty-server:3000/api",
+        "method": "PATCH",
+        "url": "=http://twenty-server:3000/rest/campaigns/{{ $('Set — Extract & Propagate Context').item.json.campaign_id ?? 'unknown' }}",
         "authentication": "predefinedCredentialType",
         "nodeCredentialType": "httpBearerAuth",
         "sendHeaders": true,
@@ -462,7 +458,7 @@
         "sendBody": true,
         "contentType": "raw",
         "rawContentType": "application/json",
-        "body": "={{ JSON.stringify({ query: 'mutation UpdateCampaignFailed($id: ID!, $reason: String) { updateCampaign(id: $id, data: { status: failed, failureReason: $reason }) { id status } }', variables: { id: $('Set — Extract & Propagate Context').item.json.campaign_id ?? 'unknown', reason: 'Webhook payload missing campaign_id. Cannot process.' } }) }}",
+        "body": "={{ JSON.stringify({ status: 'failed', failureReason: 'Webhook payload missing campaign_id. Cannot process.' }) }}",
         "options": { "timeout": 10000 }
       },
       "credentials": {
@@ -477,8 +473,8 @@
       "typeVersion": 4.2,
       "position": [1880, 400],
       "parameters": {
-        "method": "POST",
-        "url": "http://twenty-server:3000/api",
+        "method": "PATCH",
+        "url": "=http://twenty-server:3000/rest/campaigns/{{ $json.campaign_id }}",
         "authentication": "predefinedCredentialType",
         "nodeCredentialType": "httpBearerAuth",
         "sendHeaders": true,
@@ -491,7 +487,7 @@
         "sendBody": true,
         "contentType": "raw",
         "rawContentType": "application/json",
-        "body": "={{ JSON.stringify({ query: 'mutation UpdateCampaignFailed($id: ID!, $reason: String) { updateCampaign(id: $id, data: { status: failed, failureReason: $reason }) { id status } }', variables: { id: $json.campaign_id, reason: `Brand check failed (score: ${$json.brand_score}/100). Flags: ${($json.brand_flags ?? []).join(', ')}. ${$json.brand_summary}` } }) }}",
+        "body": "={{ JSON.stringify({ status: 'failed', failureReason: `Brand check failed (score: ${$json.brand_score}/100). Flags: ${($json.brand_flags ?? []).join(', ')}. ${$json.brand_summary}` }) }}",
         "options": { "timeout": 10000 }
       },
       "credentials": {
@@ -513,18 +509,20 @@
       "typeVersion": 4.2,
       "position": [440, 600],
       "parameters": {
-        "method": "POST",
-        "url": "http://twenty-server:3000/api",
+        "method": "PATCH",
+        "url": "=http://twenty-server:3000/rest/campaigns/{{ $json.execution?.customData?.campaign_id ?? 'unknown' }}",
         "authentication": "predefinedCredentialType",
         "nodeCredentialType": "httpBearerAuth",
         "sendHeaders": true,
-        "headerParameters": [
-          { "name": "Content-Type", "value": "application/json" }
-        ],
+        "headerParameters": {
+          "parameters": [
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
         "sendBody": true,
         "contentType": "raw",
         "rawContentType": "application/json",
-        "body": "={{ JSON.stringify({ query: 'mutation UpdateCampaignFailed($id: ID!, $reason: String) { updateCampaign(id: $id, data: { status: failed, failureReason: $reason }) { id status } }', variables: { id: $json.execution?.customData?.campaign_id ?? 'unknown', reason: ('Workflow exception: ' + ($json.error?.message ?? 'unknown error') + ' in node: ' + ($json.error?.node?.name ?? 'unknown')) } }) }}",
+        "body": "={{ JSON.stringify({ status: 'failed', failureReason: ('Workflow exception: ' + ($json.error?.message ?? 'unknown error') + ' in node: ' + ($json.error?.node?.name ?? 'unknown')) }) }}",
         "options": { "timeout": 10000 }
       },
       "credentials": {
