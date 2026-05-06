@@ -1,0 +1,51 @@
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Build artifacts
+dist/
+build/
+.turbo/
+.next/
+.wrangler/
+.cache/
+
+# Env / secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.crt
+
+# Logs
+*.log
+npm-debug.log*
+pnpm-debug.log*
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.swp
+
+# Coverage
+coverage/
+*.lcov
+
+# Cloudflare
+wrangler.toml.local
+
+# Docker / runtime data
+infra/data/
+infra/postgres/data/
+infra/minio/data/
+infra/loki/data/
+infra/grafana/data/
+
+# Vendor (lives outside repo, but guard against accidental moves)
+vendor/
+
+# Worktree leftovers
+.claude/worktrees/

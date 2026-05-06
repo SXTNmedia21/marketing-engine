@@ -1,0 +1,17 @@
+name = "lp-form"
+main = "src/index.ts"
+compatibility_date = "2025-01-01"
+compatibility_flags = ["nodejs_compat"]
+account_id = "REPLACE_ME"
+
+[vars]
+CONTROL_PLANE_URL = "https://api.REPLACE_ME"
+TURNSTILE_SECRET = ""
+ENVIRONMENT = "development"
+
+[env.staging]
+vars = { ENVIRONMENT = "staging", CONTROL_PLANE_URL = "https://staging-api.REPLACE_ME" }
+
+[env.production]
+vars = { ENVIRONMENT = "production", CONTROL_PLANE_URL = "https://api.REPLACE_ME" }
+routes = [{ pattern = "submit.lp.REPLACE_ME/*", zone_name = "REPLACE_ME" }]

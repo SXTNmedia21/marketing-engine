@@ -1,0 +1,30 @@
+name = "lp-render"
+main = "src/index.ts"
+compatibility_date = "2025-01-01"
+compatibility_flags = ["nodejs_compat"]
+account_id = "REPLACE_ME"
+
+[vars]
+EVENTS_ENDPOINT = "https://lp-events.REPLACE_ME.workers.dev"
+FORM_ENDPOINT = "https://lp-form.REPLACE_ME.workers.dev"
+ENVIRONMENT = "development"
+
+[[kv_namespaces]]
+binding = "LP_CONFIGS"
+id = "REPLACE_ME"
+preview_id = "REPLACE_ME"
+
+[env.staging]
+vars = { ENVIRONMENT = "staging", EVENTS_ENDPOINT = "https://staging-lp-events.REPLACE_ME.workers.dev", FORM_ENDPOINT = "https://staging-lp-form.REPLACE_ME.workers.dev" }
+
+[[env.staging.kv_namespaces]]
+binding = "LP_CONFIGS"
+id = "REPLACE_ME"
+
+[env.production]
+vars = { ENVIRONMENT = "production", EVENTS_ENDPOINT = "https://events.lp.REPLACE_ME", FORM_ENDPOINT = "https://submit.lp.REPLACE_ME" }
+routes = [{ pattern = "lp.REPLACE_ME/*", zone_name = "REPLACE_ME" }]
+
+[[env.production.kv_namespaces]]
+binding = "LP_CONFIGS"
+id = "REPLACE_ME"

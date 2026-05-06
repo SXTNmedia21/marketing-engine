@@ -1,0 +1,46 @@
+# Marketing Engine — Caddy reverse proxy
+# Set domains via env or replace inline. ACME auto-TLS via Let's Encrypt.
+
+{
+	email admin@example.com
+}
+
+# CRM
+crm.example.com {
+	reverse_proxy twenty-server:3000
+	encode zstd gzip
+}
+
+# n8n
+n8n.example.com {
+	reverse_proxy n8n:5678
+	encode zstd gzip
+}
+
+# Postiz
+postiz.example.com {
+	reverse_proxy postiz:3000
+	encode zstd gzip
+}
+
+# control-api (lead/event ingest from Cloudflare Workers)
+api.example.com {
+	reverse_proxy control-api:8080
+	encode zstd gzip
+	@workers {
+		header Cf-Worker *
+	}
+	header @workers X-Forwarded-By "cloudflare-worker"
+}
+
+# Grafana
+grafana.example.com {
+	reverse_proxy grafana:3000
+	encode zstd gzip
+}
+
+# MinIO console (intern only — bind to Tailscale eventually)
+minio.example.com {
+	reverse_proxy minio:9001
+	encode zstd gzip
+}
